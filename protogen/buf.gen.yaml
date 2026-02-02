@@ -1,0 +1,12 @@
+version: v2
+inputs:
+  - module: buf.build/meshtastic/protobufs:v2.7.18
+managed:
+  enabled: true
+  override:
+    - file_option: go_package_prefix
+      value: github.com/coreyvan/chirp/protogen
+plugins:
+  - remote: buf.build/protocolbuffers/go
+    out: protogen
+    opt: paths=source_relative

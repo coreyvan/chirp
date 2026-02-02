@@ -1,0 +1,7 @@
+version: '3'
+
+tasks:
+  gen:
+    desc: Generate Go models from the Meshtastic protobufs module
+    cmds:
+      - buf generate --template protogen/buf.gen.yaml
