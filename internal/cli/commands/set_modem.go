@@ -1,4 +1,4 @@
-package cli
+package commands
 
 import (
 	"context"
@@ -9,21 +9,22 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newSetOwnerCommand(cliCtx *Context, opener radioOpener) *cobra.Command {
-	var name string
+func newSetModemCommand(cliCtx *Context, opener radioOpener) *cobra.Command {
+	var mode string
 
 	cmd := &cobra.Command{
-		Use:   "owner",
-		Short: "Set owner long name",
+		Use:   "modem",
+		Short: "Set modem preset",
 		Args:  wrapPositionalArgs(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := appnode.ValidateSetOwnerRequest(appnode.SetOwnerRequest{Name: name}); err != nil {
+			normalizedMode, err := appnode.NormalizeAndValidateModemMode(mode)
+			if err != nil {
 				return mapServiceError(err)
 			}
 
 			return runWithRadio(cmd.Context(), cliCtx, opener, RadioRunnerFunc(func(_ context.Context, radio Radio) error {
 				service := appnode.NewService(radio)
-				result, err := service.SetOwner(cmd.Context(), appnode.SetOwnerRequest{Name: name})
+				result, err := service.SetModem(cmd.Context(), appnode.SetModemRequest{Mode: normalizedMode})
 				if err != nil {
 					return mapServiceError(err)
 				}
@@ -31,18 +32,18 @@ func newSetOwnerCommand(cliCtx *Context, opener radioOpener) *cobra.Command {
 				if cliCtx.JSON {
 					return json.NewEncoder(cmd.OutOrStdout()).Encode(map[string]any{
 						"ok":   true,
-						"name": result.Name,
+						"mode": result.Mode,
 					})
 				}
 
-				_, err = fmt.Fprintf(cmd.OutOrStdout(), "owner set to %q\n", result.Name)
+				_, err = fmt.Fprintf(cmd.OutOrStdout(), "modem mode set to %q\n", result.Mode)
 				return err
 			}))
 		},
 	}
 
-	cmd.Flags().StringVar(&name, "name", "", "owner long name")
-	_ = cmd.MarkFlagRequired("name")
+	cmd.Flags().StringVar(&mode, "mode", "", "modem preset (lf|ls|vls|ms|mf|sl|sf|lm)")
+	_ = cmd.MarkFlagRequired("mode")
 
 	return cmd
 }
