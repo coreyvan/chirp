@@ -139,3 +139,27 @@ func TestFactoryResetYesSkipsPromptAndRuns(t *testing.T) {
 		t.Fatalf("missing success output: %q", out.String())
 	}
 }
+
+func TestFactoryResetPromptConfirmRuns(t *testing.T) {
+	cliCtx := &Context{Port: "/dev/test", Timeout: time.Second}
+	r := &commandTestRadio{}
+	cmd := newFactoryResetCommand(cliCtx, func(string) (Radio, error) {
+		return r, nil
+	})
+	cmd.SetIn(strings.NewReader("y\n"))
+
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if r.factoryResetCalls != 1 {
+		t.Fatalf("factory reset calls = %d, want 1", r.factoryResetCalls)
+	}
+	if !strings.Contains(out.String(), "This action is destructive. Continue? [y/N]") {
+		t.Fatalf("missing confirmation prompt in output: %q", out.String())
+	}
+}
