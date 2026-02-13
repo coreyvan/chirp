@@ -84,6 +84,10 @@ func newRootCommand() *cobra.Command {
 
 	cmd.AddCommand(newVersionCommand(ctx))
 	cmd.AddCommand(newListenCommand(ctx, nil))
+	cmd.AddCommand(newInfoCommand(ctx, nil))
+	cmd.AddCommand(newSendCommand(ctx, nil))
+	cmd.AddCommand(newSetCommand(ctx, nil))
+	cmd.AddCommand(newFactoryResetCommand(ctx, nil))
 
 	return cmd
 }
