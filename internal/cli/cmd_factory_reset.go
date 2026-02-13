@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	appnode "github.com/coreyvan/chirp/internal/app/node"
 	"github.com/spf13/cobra"
 )
 
@@ -29,8 +30,9 @@ func newFactoryResetCommand(cliCtx *Context, opener radioOpener) *cobra.Command 
 			}
 
 			return runWithRadio(cmd.Context(), cliCtx, opener, RadioRunnerFunc(func(_ context.Context, radio Radio) error {
-				if err := radio.FactoryReset(); err != nil {
-					return fmt.Errorf("factory-reset: %w", err)
+				service := appnode.NewService(radio)
+				if err := service.FactoryReset(cmd.Context()); err != nil {
+					return mapServiceError(err)
 				}
 
 				if cliCtx.JSON {

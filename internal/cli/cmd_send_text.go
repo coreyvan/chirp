@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 
+	appnode "github.com/coreyvan/chirp/internal/app/node"
 	"github.com/spf13/cobra"
 )
 
@@ -21,31 +21,35 @@ func newSendTextCommand(cliCtx *Context, opener radioOpener) *cobra.Command {
 		Short: "Send a text message",
 		Args:  wrapPositionalArgs(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if strings.TrimSpace(message) == "" {
-				return newUserInputError(fmt.Errorf("--message cannot be empty"))
-			}
-			if to < 0 {
-				return newUserInputError(fmt.Errorf("--to must be >= 0"))
-			}
-			if channel < 0 {
-				return newUserInputError(fmt.Errorf("--channel must be >= 0"))
+			if err := appnode.ValidateSendTextRequest(appnode.SendTextRequest{
+				Message: message,
+				To:      to,
+				Channel: channel,
+			}); err != nil {
+				return mapServiceError(err)
 			}
 
 			return runWithRadio(cmd.Context(), cliCtx, opener, RadioRunnerFunc(func(_ context.Context, radio Radio) error {
-				if err := radio.SendTextMessage(message, to, channel); err != nil {
-					return fmt.Errorf("send text: %w", err)
+				service := appnode.NewService(radio)
+				result, err := service.SendText(cmd.Context(), appnode.SendTextRequest{
+					Message: message,
+					To:      to,
+					Channel: channel,
+				})
+				if err != nil {
+					return mapServiceError(err)
 				}
 
 				if cliCtx.JSON {
 					return json.NewEncoder(cmd.OutOrStdout()).Encode(map[string]any{
 						"ok":      true,
-						"to":      to,
-						"channel": channel,
-						"message": message,
+						"to":      result.To,
+						"channel": result.Channel,
+						"message": result.Message,
 					})
 				}
 
-				_, err := fmt.Fprintf(cmd.OutOrStdout(), "sent text to=%d channel=%d\n", to, channel)
+				_, err = fmt.Fprintf(cmd.OutOrStdout(), "sent text to=%d channel=%d\n", result.To, result.Channel)
 				return err
 			}))
 		},

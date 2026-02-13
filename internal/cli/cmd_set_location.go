@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math"
 
+	appnode "github.com/coreyvan/chirp/internal/app/node"
 	"github.com/spf13/cobra"
 )
 
@@ -21,34 +21,35 @@ func newSetLocationCommand(cliCtx *Context, opener radioOpener) *cobra.Command {
 		Short: "Set fixed location payload",
 		Args:  wrapPositionalArgs(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			lat, err := int32FromInt64Flag("--lat-i", latI)
-			if err != nil {
-				return err
-			}
-			lon, err := int32FromInt64Flag("--lon-i", lonI)
-			if err != nil {
-				return err
-			}
-			altitude, err := int32FromInt64Flag("--alt", alt)
-			if err != nil {
-				return err
+			if _, err := appnode.ValidateAndConvertSetLocationRequest(appnode.SetLocationRequest{
+				LatI: latI,
+				LonI: lonI,
+				Alt:  alt,
+			}); err != nil {
+				return mapServiceError(err)
 			}
 
 			return runWithRadio(cmd.Context(), cliCtx, opener, RadioRunnerFunc(func(_ context.Context, radio Radio) error {
-				if err := radio.SetLocation(lat, lon, altitude); err != nil {
-					return fmt.Errorf("set location: %w", err)
+				service := appnode.NewService(radio)
+				result, err := service.SetLocation(cmd.Context(), appnode.SetLocationRequest{
+					LatI: latI,
+					LonI: lonI,
+					Alt:  alt,
+				})
+				if err != nil {
+					return mapServiceError(err)
 				}
 
 				if cliCtx.JSON {
 					return json.NewEncoder(cmd.OutOrStdout()).Encode(map[string]any{
 						"ok":    true,
-						"lat_i": lat,
-						"lon_i": lon,
-						"alt":   altitude,
+						"lat_i": result.LatI,
+						"lon_i": result.LonI,
+						"alt":   result.Alt,
 					})
 				}
 
-				_, err := fmt.Fprintf(cmd.OutOrStdout(), "location set lat_i=%d lon_i=%d alt=%d\n", lat, lon, altitude)
+				_, err = fmt.Fprintf(cmd.OutOrStdout(), "location set lat_i=%d lon_i=%d alt=%d\n", result.LatI, result.LonI, result.Alt)
 				return err
 			}))
 		},
@@ -62,11 +63,4 @@ func newSetLocationCommand(cliCtx *Context, opener radioOpener) *cobra.Command {
 	_ = cmd.MarkFlagRequired("alt")
 
 	return cmd
-}
-
-func int32FromInt64Flag(flagName string, value int64) (int32, error) {
-	if value < math.MinInt32 || value > math.MaxInt32 {
-		return 0, newUserInputError(fmt.Errorf("%s must be in int32 range", flagName))
-	}
-	return int32(value), nil
 }

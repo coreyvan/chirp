@@ -4,21 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 
+	appnode "github.com/coreyvan/chirp/internal/app/node"
 	"github.com/spf13/cobra"
 )
-
-var validModemModes = map[string]struct{}{
-	"lf":  {},
-	"ls":  {},
-	"vls": {},
-	"ms":  {},
-	"mf":  {},
-	"sl":  {},
-	"sf":  {},
-	"lm":  {},
-}
 
 func newSetModemCommand(cliCtx *Context, opener radioOpener) *cobra.Command {
 	var mode string
@@ -28,27 +17,26 @@ func newSetModemCommand(cliCtx *Context, opener radioOpener) *cobra.Command {
 		Short: "Set modem preset",
 		Args:  wrapPositionalArgs(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			mode = strings.ToLower(strings.TrimSpace(mode))
-			if mode == "" {
-				return newUserInputError(fmt.Errorf("--mode cannot be empty"))
-			}
-			if _, ok := validModemModes[mode]; !ok {
-				return newUserInputError(fmt.Errorf("--mode must be one of: lf|ls|vls|ms|mf|sl|sf|lm"))
+			normalizedMode, err := appnode.NormalizeAndValidateModemMode(mode)
+			if err != nil {
+				return mapServiceError(err)
 			}
 
 			return runWithRadio(cmd.Context(), cliCtx, opener, RadioRunnerFunc(func(_ context.Context, radio Radio) error {
-				if err := radio.SetModemMode(mode); err != nil {
-					return fmt.Errorf("set modem: %w", err)
+				service := appnode.NewService(radio)
+				result, err := service.SetModem(cmd.Context(), appnode.SetModemRequest{Mode: normalizedMode})
+				if err != nil {
+					return mapServiceError(err)
 				}
 
 				if cliCtx.JSON {
 					return json.NewEncoder(cmd.OutOrStdout()).Encode(map[string]any{
 						"ok":   true,
-						"mode": mode,
+						"mode": result.Mode,
 					})
 				}
 
-				_, err := fmt.Fprintf(cmd.OutOrStdout(), "modem mode set to %q\n", mode)
+				_, err = fmt.Fprintf(cmd.OutOrStdout(), "modem mode set to %q\n", result.Mode)
 				return err
 			}))
 		},

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	appnode "github.com/coreyvan/chirp/internal/app/node"
 	pb "github.com/coreyvan/chirp/protogen/meshtastic"
 )
 
@@ -23,7 +24,7 @@ func TestBuildInfoSummary(t *testing.T) {
 		{PayloadVariant: &pb.FromRadio_ModuleConfig{ModuleConfig: &pb.ModuleConfig{}}},
 	}
 
-	s := buildInfoSummary(responses)
+	s := appnode.BuildInfoSummary(responses)
 	if s.Responses != 6 || s.Nodes != 1 || s.Channels != 1 || s.Configs != 1 || s.ModuleConfigs != 1 {
 		t.Fatalf("unexpected summary counts: %+v", s)
 	}
@@ -39,7 +40,7 @@ func TestBuildInfoSummary(t *testing.T) {
 }
 
 func TestWriteInfoJSONIncludesSummaryAndResponses(t *testing.T) {
-	summary := infoSummary{Responses: 1, MyNode: "!00000001"}
+	summary := appnode.InfoSummary{Responses: 1, MyNode: "!00000001"}
 	responses := []*pb.FromRadio{
 		{PayloadVariant: &pb.FromRadio_Rebooted{Rebooted: true}},
 	}
