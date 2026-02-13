@@ -16,7 +16,7 @@ body {
 
 .page {
   margin: 0 auto;
-  max-width: 960px;
+  max-width: 1100px;
   min-height: 100vh;
   padding: 2rem 1rem 4rem;
 }
@@ -124,6 +124,79 @@ button:disabled {
   font-weight: 600;
 }
 
+.listener-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 0.85rem 0;
+}
+
+.listener-filters label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #2d4a52;
+}
+
+.listener-log {
+  border: 1px solid #d5e3e7;
+  background: #0f1820;
+  border-radius: 10px;
+  max-height: 360px;
+  overflow: auto;
+  padding: 0.45rem;
+}
+
+.log-line {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 0.5rem;
+  align-items: baseline;
+  font-family: "IBM Plex Mono", "SFMono-Regular", Menlo, monospace;
+  font-size: 0.8rem;
+  color: #d8e5eb;
+  padding: 0.2rem 0.3rem;
+}
+
+.badge {
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+  font-weight: 700;
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+}
+
+.badge.event {
+  background: #415e69;
+}
+
+.badge.packet {
+  background: #245f8f;
+}
+
+.badge.telemetry {
+  background: #1f7b67;
+}
+
+.badge.message {
+  background: #7a5a24;
+}
+
+.time {
+  color: #9ab2bd;
+  white-space: nowrap;
+}
+
+.text {
+  word-break: break-word;
+}
+
+.empty {
+  margin: 0;
+  color: #a4bcc7;
+  padding: 0.6rem;
+}
+
 .error-card {
   border-color: #e5c9c9;
   background: #fff8f8;
@@ -145,9 +218,22 @@ button:disabled {
 
   .actions {
     justify-content: flex-start;
+    flex-wrap: wrap;
   }
 
   .summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .log-line {
+    grid-template-columns: auto 1fr;
+  }
+
+  .time {
+    grid-column: 2;
+  }
+
+  .text {
+    grid-column: 1 / -1;
   }
 }

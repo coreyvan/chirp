@@ -2,6 +2,51 @@
 
 A utility for configuring and managing Meshtastic nodes in Go.
 
+## How To Run
+
+### Prerequisites
+
+- Go 1.25+
+- Node.js 20+
+- Wails CLI v2 (`wails`)
+
+### CLI
+
+Run directly with Go:
+
+```bash
+go run ./cmd/chirp --help
+```
+
+Build a local binary:
+
+```bash
+go build -o chirp ./cmd/chirp
+./chirp --help
+```
+
+### Desktop UI (Wails + Svelte + TS)
+
+Install frontend dependencies once:
+
+```bash
+cd frontend && npm install
+```
+
+Run desktop app in dev mode (hot reload):
+
+```bash
+wails dev
+```
+
+Build a packaged desktop app:
+
+```bash
+wails build
+```
+
+On macOS, the app bundle is written to `build/bin/chirp-ui.app`.
+
 ## CLI
 
 `chirp` is a slim Meshtastic serial CLI focused on common operational workflows.

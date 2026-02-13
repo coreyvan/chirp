@@ -1,13 +1,18 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onDestroy, onMount } from "svelte";
   import {
     connect,
     connectionStatus,
     disconnect,
     health,
+    listenerStatus,
     listPorts,
-    loadInfo
+    loadInfo,
+    startListener,
+    stopListener
   } from "./lib/backend";
+
+  const maxLines = 800;
 
   let backendStatus = "Booting...";
   let ports: string[] = [];
@@ -16,14 +21,63 @@
   let connectedPort = "";
   let info: ChirpInfoSummary | null = null;
 
+  let listenerRunning = false;
+  let listenerBusy = false;
+  let listenerLines: ChirpListenerLine[] = [];
+  let showEvents = true;
+  let showPackets = true;
+  let showTelemetry = true;
+  let showMessages = true;
+
   let loadingInfo = false;
   let loadingPorts = false;
   let connecting = false;
   let disconnecting = false;
   let error = "";
 
+  let unsubscribeListener: (() => void) | null = null;
+
+  $: filteredLines = listenerLines.filter((line) => {
+    if (line.category === "event") return showEvents;
+    if (line.category === "packet") return showPackets;
+    if (line.category === "telemetry") return showTelemetry;
+    if (line.category === "message") return showMessages;
+    return true;
+  });
+
   function errorMessage(err: unknown, fallback: string): string {
     return err instanceof Error ? err.message : fallback;
+  }
+
+  function appendListenerLine(line: ChirpListenerLine): void {
+    const next = [...listenerLines, line];
+    listenerLines = next.length > maxLines ? next.slice(next.length - maxLines) : next;
+  }
+
+  function subscribeListenerEvents(): void {
+    if (!window.runtime?.EventsOn) {
+      return;
+    }
+
+    unsubscribeListener = window.runtime.EventsOn("listener:line", (line) => {
+      const raw = line as Partial<ChirpListenerLine> | undefined;
+      if (!raw || typeof raw.message !== "string" || typeof raw.label !== "string") {
+        return;
+      }
+
+      appendListenerLine({
+        timestamp: typeof raw.timestamp === "string" ? raw.timestamp : new Date().toISOString(),
+        label: raw.label,
+        message: raw.message,
+        category:
+          raw.category === "packet" ||
+          raw.category === "telemetry" ||
+          raw.category === "message" ||
+          raw.category === "event"
+            ? raw.category
+            : "event"
+      });
+    });
   }
 
   async function refreshPorts(): Promise<void> {
@@ -48,6 +102,11 @@
     connectedPort = status.port;
   }
 
+  async function refreshListenerStatus(): Promise<void> {
+    const status = await listenerStatus();
+    listenerRunning = status.running;
+  }
+
   async function handleConnect(): Promise<void> {
     if (!selectedPort) {
       error = "Select a serial port first.";
@@ -60,6 +119,7 @@
     try {
       await connect(selectedPort);
       await refreshConnectionStatus();
+      await refreshListenerStatus();
       await refreshInfo();
     } catch (err) {
       error = errorMessage(err, "Failed to connect");
@@ -76,6 +136,7 @@
       await disconnect();
       info = null;
       await refreshConnectionStatus();
+      await refreshListenerStatus();
     } catch (err) {
       error = errorMessage(err, "Failed to disconnect");
     } finally {
@@ -97,7 +158,41 @@
     }
   }
 
+  async function handleStartListener(): Promise<void> {
+    listenerBusy = true;
+    error = "";
+
+    try {
+      await startListener();
+      await refreshListenerStatus();
+    } catch (err) {
+      error = errorMessage(err, "Failed to start listener");
+    } finally {
+      listenerBusy = false;
+    }
+  }
+
+  async function handleStopListener(): Promise<void> {
+    listenerBusy = true;
+    error = "";
+
+    try {
+      await stopListener();
+      await refreshListenerStatus();
+    } catch (err) {
+      error = errorMessage(err, "Failed to stop listener");
+    } finally {
+      listenerBusy = false;
+    }
+  }
+
+  function clearListener(): void {
+    listenerLines = [];
+  }
+
   onMount(async () => {
+    subscribeListenerEvents();
+
     try {
       const result = await health();
       backendStatus = `Backend: ${result}`;
@@ -110,11 +205,19 @@
     try {
       await refreshPorts();
       await refreshConnectionStatus();
+      await refreshListenerStatus();
       if (connected) {
         await refreshInfo();
       }
     } catch (err) {
       error = errorMessage(err, "Startup sync failed");
+    }
+  });
+
+  onDestroy(() => {
+    if (unsubscribeListener) {
+      unsubscribeListener();
+      unsubscribeListener = null;
     }
   });
 </script>
@@ -141,7 +244,7 @@
     <div class="row stack-mobile">
       <label class="field">
         <span>Serial Port</span>
-        <select bind:value={selectedPort} disabled={connecting || disconnecting}>
+        <select bind:value={selectedPort} disabled={connecting || disconnecting || listenerRunning}>
           {#if ports.length === 0}
             <option value="">No ports found</option>
           {:else}
@@ -154,7 +257,7 @@
       <div class="actions">
         <button
           onclick={handleConnect}
-          disabled={connecting || disconnecting || ports.length === 0 || connected}
+          disabled={connecting || disconnecting || ports.length === 0 || connected || listenerRunning}
         >
           {connecting ? "Connecting..." : "Connect"}
         </button>
@@ -196,6 +299,52 @@
     {:else}
       <p>{connected ? "No radio info loaded yet." : "Connect to a radio to view info."}</p>
     {/if}
+  </section>
+
+  <section class="card">
+    <div class="row">
+      <h2>Live Listener</h2>
+      <div class="actions">
+        <button onclick={handleStartListener} disabled={!connected || listenerRunning || listenerBusy}>
+          {listenerBusy && !listenerRunning ? "Starting..." : "Start"}
+        </button>
+        <button
+          class="secondary"
+          onclick={handleStopListener}
+          disabled={!listenerRunning || listenerBusy}
+        >
+          {listenerBusy && listenerRunning ? "Stopping..." : "Stop"}
+        </button>
+        <button class="secondary" onclick={clearListener} disabled={listenerLines.length === 0}>
+          Clear
+        </button>
+      </div>
+    </div>
+
+    <p class="status">
+      {listenerRunning ? "Listener running" : "Listener stopped"} · {listenerLines.length} lines buffered
+    </p>
+
+    <div class="listener-filters">
+      <label><input type="checkbox" bind:checked={showEvents} /> Events</label>
+      <label><input type="checkbox" bind:checked={showPackets} /> Packets</label>
+      <label><input type="checkbox" bind:checked={showTelemetry} /> Telemetry</label>
+      <label><input type="checkbox" bind:checked={showMessages} /> Messages</label>
+    </div>
+
+    <div class="listener-log" role="log" aria-live="polite">
+      {#if filteredLines.length === 0}
+        <p class="empty">No listener output yet.</p>
+      {:else}
+        {#each filteredLines as line}
+          <div class="log-line">
+            <span class={`badge ${line.category}`}>{line.label}</span>
+            <span class="time">{line.timestamp}</span>
+            <span class="text">{line.message}</span>
+          </div>
+        {/each}
+      {/if}
+    </div>
   </section>
 
   {#if error}

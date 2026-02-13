@@ -22,6 +22,17 @@ declare global {
     summary: ChirpInfoSummary;
   };
 
+  type ChirpListenerStatus = {
+    running: boolean;
+  };
+
+  type ChirpListenerLine = {
+    timestamp: string;
+    label: string;
+    message: string;
+    category: "event" | "packet" | "telemetry" | "message";
+  };
+
   interface Window {
     go?: {
       uiapp?: {
@@ -32,8 +43,14 @@ declare global {
           Disconnect: () => Promise<void>;
           ConnectionStatus: () => Promise<ChirpConnectionStatus>;
           LoadInfo: () => Promise<ChirpInfoView>;
+          StartListener: () => Promise<void>;
+          StopListener: () => Promise<void>;
+          GetListenerStatus: () => Promise<ChirpListenerStatus>;
         };
       };
+    };
+    runtime?: {
+      EventsOn: (eventName: string, callback: (...args: unknown[]) => void) => () => void;
     };
   }
 }

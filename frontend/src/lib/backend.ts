@@ -32,3 +32,15 @@ export async function connectionStatus(): Promise<ChirpConnectionStatus> {
 export async function loadInfo(): Promise<ChirpInfoView> {
   return getBindings().LoadInfo();
 }
+
+export async function startListener(): Promise<void> {
+  return getBindings().StartListener();
+}
+
+export async function stopListener(): Promise<void> {
+  return getBindings().StopListener();
+}
+
+export async function listenerStatus(): Promise<ChirpListenerStatus> {
+  return getBindings().GetListenerStatus();
+}
