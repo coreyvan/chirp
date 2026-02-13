@@ -27,6 +27,11 @@ Build a slimmed-down Meshtastic CLI focused on the most useful day-to-day workfl
   - `--timeout duration` (default `2s`)
   - `--json` (machine-readable output for non-listen commands)
   - `--verbose` (debug logs)
+- Destructive command confirmations:
+  - Commands that can permanently alter device state (starting with `factory-reset`) must require explicit confirmation.
+  - Default behavior should prompt: `This action is destructive. Continue? [y/N]`.
+  - Add `--yes` / `-y` to skip the prompt for automation and scripted usage.
+  - If not confirmed, exit cleanly with a non-zero code and a clear cancellation message.
 - Exit codes:
   - `0` success
   - `1` runtime/transport/protocol error
@@ -83,17 +88,19 @@ internal/cli/cmd_factory_reset.go
 3. `chirp set owner --name "<name>"`
 4. `chirp set modem --mode <preset>`
 5. `chirp set location --lat-i <int> --lon-i <int> --alt <int>`
-6. `chirp factory-reset`
+6. `chirp factory-reset` (requires confirmation prompt unless `--yes` is provided)
 
 ### Phase 5: Output and Quality
 1. Add `--json` support for non-streaming commands.
 2. Add table/text formatting helpers for human output.
-3. Add docs/examples in `README.md`.
-4. Add CI checks for CLI build + tests.
+3. Add unit/integration coverage for destructive confirmation flows (`prompt confirm`, `prompt deny`, `--yes` non-interactive path).
+4. Add docs/examples in `README.md`, including automation-safe `--yes` usage.
+5. Add CI checks for CLI build + tests.
 
 ## Testing Plan
 - Unit tests for command argument validation.
 - Unit tests for command handlers with mocked radio interface.
+- Unit tests for destructive confirmation logic and cancellation behavior.
 - Integration tests behind build tag `integration` and real hardware.
 - Smoke checks:
   - `chirp listen --port ...`
