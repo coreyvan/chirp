@@ -1,0 +1,153 @@
+:root {
+  color-scheme: light;
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  line-height: 1.4;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: linear-gradient(150deg, #eef7ff, #f4fff6);
+  color: #132124;
+}
+
+.page {
+  margin: 0 auto;
+  max-width: 960px;
+  min-height: 100vh;
+  padding: 2rem 1rem 4rem;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.header p {
+  margin: 0.5rem 0 1.5rem;
+  color: #39525a;
+}
+
+.card {
+  margin-top: 1rem;
+  border: 1px solid #cadbe0;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.82);
+  padding: 1rem;
+  box-shadow: 0 8px 24px rgba(25, 40, 44, 0.08);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.stack-mobile {
+  margin-top: 0.75rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 300px;
+}
+
+.field span {
+  font-size: 0.9rem;
+  color: #39525a;
+}
+
+select {
+  border: 1px solid #b7cdd3;
+  border-radius: 10px;
+  background: #f9fdff;
+  color: #132124;
+  padding: 0.55rem 0.65rem;
+  font: inherit;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+button {
+  border: 0;
+  border-radius: 10px;
+  background: #1a7568;
+  color: #fff;
+  cursor: pointer;
+  padding: 0.55rem 0.9rem;
+  font: inherit;
+}
+
+button.secondary {
+  background: #44646b;
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.status {
+  margin: 0.8rem 0 0;
+}
+
+.summary-grid {
+  margin: 0.75rem 0 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.summary-grid div {
+  border: 1px solid #dbe8ec;
+  border-radius: 10px;
+  padding: 0.65rem 0.7rem;
+  background: #f9fdff;
+}
+
+.summary-grid dt {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #56737a;
+}
+
+.summary-grid dd {
+  margin: 0.25rem 0 0;
+  font-weight: 600;
+}
+
+.error-card {
+  border-color: #e5c9c9;
+  background: #fff8f8;
+}
+
+.error {
+  color: #9e2424;
+}
+
+@media (max-width: 768px) {
+  .stack-mobile {
+    display: grid;
+    justify-content: stretch;
+  }
+
+  .field {
+    min-width: 0;
+  }
+
+  .actions {
+    justify-content: flex-start;
+  }
+
+  .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

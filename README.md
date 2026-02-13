@@ -55,3 +55,25 @@ chirp factory-reset --yes
 - `0` success
 - `1` runtime/transport/protocol error
 - `2` invalid user input/flags
+
+## Desktop UI (Wails)
+
+The repo includes a Wails desktop scaffold using Svelte + TypeScript in
+`frontend/`.
+
+### Prerequisites
+
+- Wails CLI installed
+- Node.js 20+
+- Go 1.25+
+
+### Run in development mode
+
+```bash
+wails dev
+```
+
+Development behavior:
+
+- Frontend Svelte/TS/CSS updates hot reload in the desktop window.
+- Go backend updates rebuild/restart the app process automatically.
