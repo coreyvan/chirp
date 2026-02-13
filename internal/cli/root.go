@@ -2,7 +2,6 @@ package cli
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/spf13/cobra"
 )
@@ -70,10 +69,7 @@ func newRootCommand() *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
-			if ctx.Timeout <= 0 {
-				return newUserInputError(fmt.Errorf("--timeout must be greater than 0"))
-			}
-			return nil
+			return validateContext(ctx)
 		},
 	}
 
