@@ -2,6 +2,7 @@ package serial
 
 import (
 	"fmt"
+	"time"
 
 	sdkserial "go.bug.st/serial"
 )
@@ -47,4 +48,19 @@ func GetPorts() ([]string, error) {
 	}
 
 	return p, nil
+}
+
+func (s *SerialStreamer) Read(p []byte) (int, error) {
+	return s.port.Read(p)
+}
+
+func (s *SerialStreamer) Write(p []byte) (int, error) {
+	n, err := s.port.Write(p)
+	if err != nil {
+		return 0, err
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	return n, nil
 }
