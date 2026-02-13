@@ -83,6 +83,7 @@ func newRootCommand() *cobra.Command {
 	cmd.PersistentFlags().BoolVar(&ctx.Verbose, "verbose", false, "enable debug logs")
 
 	cmd.AddCommand(newVersionCommand(ctx))
+	cmd.AddCommand(newListenCommand(ctx, nil))
 
 	return cmd
 }

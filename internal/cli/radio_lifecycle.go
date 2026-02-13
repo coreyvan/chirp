@@ -156,6 +156,44 @@ func runWithRadio(parent context.Context, cliCtx *Context, opener radioOpener, r
 	}
 }
 
+func runWithRadioNoTimeout(parent context.Context, cliCtx *Context, opener radioOpener, runner RadioRunner) (err error) {
+	if err := validateContext(cliCtx); err != nil {
+		return err
+	}
+	if opener == nil {
+		opener = defaultRadioOpener
+	}
+	if runner == nil {
+		return newRuntimeError(fmt.Errorf("internal error: missing command runner"))
+	}
+
+	r, err := opener(cliCtx.Port)
+	if err != nil {
+		return formatOpenRadioError(cliCtx.Port, err)
+	}
+
+	defer func() {
+		closeErr := r.Close()
+		if closeErr != nil {
+			err = errors.Join(err, newRuntimeError(fmt.Errorf("close radio: %w", closeErr)))
+		}
+	}()
+
+	base := parent
+	if base == nil {
+		base = context.Background()
+	}
+
+	runErr := runner.Run(base, r)
+	if runErr == nil {
+		return nil
+	}
+	if errors.Is(runErr, context.DeadlineExceeded) {
+		return formatTimeoutError(cliCtx.Timeout.String())
+	}
+	return newRuntimeError(runErr)
+}
+
 func newRadioCommand(use, short string, cliCtx *Context, opener radioOpener, runner RadioRunner) *cobra.Command {
 	return &cobra.Command{
 		Use:   use,
