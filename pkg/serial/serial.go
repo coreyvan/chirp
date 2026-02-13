@@ -8,10 +8,8 @@ import (
 )
 
 const (
-	baudRate       int = 115200
-	dataBits       int = 8
-	stopBits       int = 0
-	parityNoParity int = 0
+	baudRate int = 115200
+	dataBits int = 8
 )
 
 type SerialStreamer struct {
@@ -21,11 +19,13 @@ type SerialStreamer struct {
 
 func NewSerialStreamer(device string) (*SerialStreamer, error) {
 	port, err := sdkserial.Open(device, &sdkserial.Mode{
-		BaudRate:          baudRate,
-		DataBits:          dataBits,
-		Parity:            sdkserial.Parity(parityNoParity),
-		StopBits:          sdkserial.StopBits(stopBits),
-		InitialStatusBits: &sdkserial.ModemOutputBits{},
+		BaudRate: baudRate,
+		DataBits: dataBits,
+		Parity:   sdkserial.NoParity,
+		StopBits: sdkserial.OneStopBit,
+		// Keep default modem bits (DTR/RTS true). For some USB bridges, forcing
+		// these low can prevent expected radio serial behavior.
+		InitialStatusBits: nil,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not open serial connection: %w", err)
@@ -63,4 +63,8 @@ func (s *SerialStreamer) Write(p []byte) (int, error) {
 	time.Sleep(100 * time.Millisecond)
 
 	return n, nil
+}
+
+func (s *SerialStreamer) SetReadTimeout(d time.Duration) error {
+	return s.port.SetReadTimeout(d)
 }
