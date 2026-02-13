@@ -1,7 +1,6 @@
 package radio
 
 import (
-	"bytes"
 	"errors"
 	"io"
 	"log"
@@ -19,6 +18,8 @@ const (
 	start2                = byte(0xc3)
 	headerLen             = 4
 	maxToFromRadioSize    = 512
+	maxTextMessageLen     = 240
+	maxPacketID           = 2386827
 	broadcastNum          = uint32(0xffffffff)
 	defaultHopLimit       = uint32(3)
 	radioInfoConfigID     = 42
@@ -28,6 +29,14 @@ const (
 	readResponsePoll      = 200 * time.Millisecond
 	wakeSendAttempts      = 1
 	wakeSendInterval      = 300 * time.Millisecond
+)
+
+var (
+	errNodeNumUnknown  = errors.New("failed to determine node number")
+	errRadioInfoFailed = errors.New("failed to get radio info")
+	errMessageTooLarge = errors.New("message too large")
+	errNameTooShort    = errors.New("name too short")
+	errInvalidModem    = errors.New("invalid modem mode")
 )
 
 type Streamer interface {
@@ -80,14 +89,14 @@ func (r *Radio) getNodeNum() error {
 
 	var nodeNum uint32
 	for _, response := range radioResponses {
-		if info, ok := response.GetPayloadVariant().(*pb.FromRadio_MyInfo); ok && info.MyInfo != nil {
-			nodeNum = info.MyInfo.MyNodeNum
+		if myInfo := response.GetMyInfo(); myInfo != nil {
+			nodeNum = myInfo.GetMyNodeNum()
 			break
 		}
 	}
 
 	if nodeNum == 0 {
-		return errors.New("failed to determine node number")
+		return errNodeNumUnknown
 	}
 
 	r.nodeNum = nodeNum
@@ -99,7 +108,9 @@ func (r *Radio) SendPacket(protobufPacket []byte) error {
 	packetLength := len(protobufPacket)
 	header := []byte{start1, start2, byte(packetLength>>8) & 0xff, byte(packetLength) & 0xff}
 
-	radioPacket := append(header, protobufPacket...)
+	radioPacket := make([]byte, 0, len(header)+len(protobufPacket))
+	radioPacket = append(radioPacket, header...)
+	radioPacket = append(radioPacket, protobufPacket...)
 	n, err := r.streamer.Write(radioPacket)
 	if err != nil {
 		return err
@@ -118,9 +129,9 @@ func (r *Radio) ReadResponse(timeout bool) ([]*pb.FromRadio, error) {
 	}
 
 	b := make([]byte, 1)
-	processedBytes := make([]byte, 0)
-	emptyByte := make([]byte, 0)
-	previousByte := make([]byte, 1)
+	buf := make([]byte, 0, maxToFromRadioSize+headerLen)
+	var previousByte byte
+	hasPrevious := false
 	repeatByteCounter := 0
 
 	var fromRadioPackets []*pb.FromRadio
@@ -128,15 +139,19 @@ func (r *Radio) ReadResponse(timeout bool) ([]*pb.FromRadio, error) {
 	deadline := time.Now().Add(readResponseTimeout)
 	for {
 		n, err := r.streamer.Read(b)
+
 		if n > 0 {
-			if bytes.Equal(b, previousByte) {
+			currentByte := b[0]
+			if hasPrevious && currentByte == previousByte {
 				repeatByteCounter++
 			} else {
 				repeatByteCounter = 0
 			}
+			previousByte = currentByte
+			hasPrevious = true
 		}
 
-		shouldBreakOnRepeat := repeatByteCounter > 20 && len(processedBytes) < headerLen
+		shouldBreakOnRepeat := repeatByteCounter > 20 && len(buf) < headerLen
 		if err == io.EOF || shouldBreakOnRepeat || errors.Is(err, os.ErrDeadlineExceeded) {
 			break
 		} else if err != nil {
@@ -150,35 +165,37 @@ func (r *Radio) ReadResponse(timeout bool) ([]*pb.FromRadio, error) {
 			continue
 		}
 
-		copy(previousByte, b)
+		buf = append(buf, b[0])
 
-		pointer := len(processedBytes)
-		processedBytes = append(processedBytes, b[0])
+		switch len(buf) {
+		case 1:
+			if buf[0] != start1 {
+				buf = buf[:0]
+			}
+		case 2:
+			if buf[1] != start2 {
+				buf = buf[:0]
+			}
+		}
 
-		switch {
-		case pointer == 0:
-			if b[0] != start1 {
-				processedBytes = emptyByte
-			}
-		case pointer == 1:
-			if b[0] != start2 {
-				processedBytes = emptyByte
-			}
-		case pointer >= headerLen:
-			packetLength := int(processedBytes[2])<<8 | int(processedBytes[3])
-			if pointer == headerLen && packetLength > maxToFromRadioSize {
-				processedBytes = emptyByte
-				continue
+		if len(buf) < headerLen {
+			continue
+		}
+
+		packetLength := int(buf[2])<<8 | int(buf[3])
+		if len(buf) == headerLen && packetLength > maxToFromRadioSize {
+			buf = buf[:0]
+			continue
+		}
+
+		if len(buf) == packetLength+headerLen {
+			fromRadio := pb.FromRadio{}
+			if err := proto.Unmarshal(buf[headerLen:], &fromRadio); err != nil {
+				return nil, err
 			}
 
-			if len(processedBytes) != 0 && pointer+1 == packetLength+headerLen {
-				fromRadio := pb.FromRadio{}
-				if err := proto.Unmarshal(processedBytes[headerLen:], &fromRadio); err != nil {
-					return nil, err
-				}
-				fromRadioPackets = append(fromRadioPackets, &fromRadio)
-				processedBytes = emptyByte
-			}
+			fromRadioPackets = append(fromRadioPackets, &fromRadio)
+			buf = buf[:0]
 		}
 	}
 
@@ -201,27 +218,20 @@ func (r *Radio) GetRadioInfo() ([]*pb.FromRadio, error) {
 		time.Sleep(wakeSendInterval)
 	}
 
-	radioResponses, err := r.ReadResponse(true)
-	if err != nil {
-		return nil, err
-	}
-
-	checks := 0
-	for checks < radioInfoMaxPolls && len(radioResponses) == 0 {
-		radioResponses, err = r.ReadResponse(true)
+	for checks := 0; checks <= radioInfoMaxPolls; checks++ {
+		radioResponses, err := r.ReadResponse(true)
 		if err != nil {
 			return nil, err
 		}
 
-		checks++
+		if len(radioResponses) > 0 {
+			return radioResponses, nil
+		}
+
 		time.Sleep(radioInfoPollInterval)
 	}
 
-	if len(radioResponses) == 0 {
-		return nil, errors.New("failed to get radio info")
-	}
-
-	return radioResponses, nil
+	return nil, errRadioInfoFailed
 }
 
 // createAdminPacket builds an admin message packet to send to the radio.
@@ -257,11 +267,11 @@ func (r *Radio) SendTextMessage(message string, to int64, channel int64) error {
 		address = uint32(to)
 	}
 
-	if len(message) > 240 {
-		return errors.New("message too large")
+	if len(message) > maxTextMessageLen {
+		return errMessageTooLarge
 	}
 
-	packetID := uint32(rand.New(rand.NewSource(time.Now().UnixNano())).Intn(2386827) + 1)
+	packetID := uint32(rand.New(rand.NewSource(time.Now().UnixNano())).Intn(maxPacketID) + 1)
 	radioMessage := pb.ToRadio{
 		PayloadVariant: &pb.ToRadio_Packet{
 			Packet: &pb.MeshPacket{
@@ -291,7 +301,7 @@ func (r *Radio) SendTextMessage(message string, to int64, channel int64) error {
 // SetRadioOwner sets the owner name reported by this radio.
 func (r *Radio) SetRadioOwner(name string) error {
 	if len(name) <= 2 {
-		return errors.New("name too short")
+		return errNameTooShort
 	}
 
 	shortName := name
@@ -342,7 +352,7 @@ func (r *Radio) SetModemMode(mode string) error {
 	case "lm":
 		modemSetting = pb.Config_LoRaConfig_LONG_MODERATE
 	default:
-		return errors.New("invalid modem mode")
+		return errInvalidModem
 	}
 
 	adminPacket := pb.AdminMessage{
